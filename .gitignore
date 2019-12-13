@@ -1,0 +1,5 @@
+hmq
+log
+log/*
+*.test
+.vscode
