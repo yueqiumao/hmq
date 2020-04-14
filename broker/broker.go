@@ -3,7 +3,6 @@
 package broker
 
 import (
-	// "fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -13,13 +12,7 @@ import (
 	"github.com/fhmq/hmq/broker/lib/sessions"
 	"github.com/fhmq/hmq/broker/lib/topics"
 	"github.com/fhmq/hmq/plugins/auth"
-	"github.com/fhmq/hmq/pool"
 	"golang.org/x/net/websocket"
-)
-
-const (
-	MessagePoolNum        = 1024
-	MessagePoolMessageNum = 1024
 )
 
 type Message struct {
@@ -31,20 +24,10 @@ type Broker struct {
 	id         string
 	mu         sync.Mutex
 	config     *Config
-	wpool      *pool.WorkerPool
 	clients    sync.Map
 	topicsMgr  *topics.Manager
 	sessionMgr *sessions.Manager
 	auth       auth.Auth
-}
-
-func newMessagePool() []chan *Message {
-	pool := make([]chan *Message, 0)
-	for i := 0; i < MessagePoolNum; i++ {
-		ch := make(chan *Message, MessagePoolMessageNum)
-		pool = append(pool, ch)
-	}
-	return pool
 }
 
 func NewBroker(config *Config) (*Broker, error) {
@@ -55,8 +38,6 @@ func NewBroker(config *Config) (*Broker, error) {
 	b := &Broker{
 		id:     GenUniqueId(),
 		config: config,
-		wpool:  pool.New(config.Worker),
-		// nodes:       make(map[string]interface{}),
 	}
 
 	var err error
@@ -75,18 +56,6 @@ func NewBroker(config *Config) (*Broker, error) {
 	b.auth = auth.NewAuth(b.config.Plugin.Auth)
 
 	return b, nil
-}
-
-func (b *Broker) SubmitWork(clientId string, msg *Message) {
-	if b.wpool == nil {
-		b.wpool = pool.New(b.config.Worker)
-	}
-
-	if msg.client.typ != CLUSTER {
-		b.wpool.Submit(clientId, func() {
-			ProcessMessage(msg)
-		})
-	}
 }
 
 func (b *Broker) Start() {
@@ -121,7 +90,7 @@ func (b *Broker) StartWebsocketListening() {
 func (b *Broker) wsHandler(ws *websocket.Conn) {
 	// io.Copy(ws, ws)
 	ws.PayloadType = websocket.BinaryFrame
-	b.handleConnection(CLIENT, ws)
+	b.handleConnection(ws)
 }
 
 func (b *Broker) StartClientListening() {
@@ -153,12 +122,12 @@ func (b *Broker) StartClientListening() {
 			continue
 		}
 		tmpDelay = ACCEPT_MIN_SLEEP
-		go b.handleConnection(CLIENT, conn)
+		go b.handleConnection(conn)
 
 	}
 }
 
-func (b *Broker) handleConnection(typ int, conn net.Conn) {
+func (b *Broker) handleConnection(conn net.Conn) {
 	//process connect packet
 	packet, err := packets.ReadPacket(conn)
 	if err != nil {
@@ -190,7 +159,7 @@ func (b *Broker) handleConnection(typ int, conn net.Conn) {
 		return
 	}
 
-	if typ == CLIENT && !b.CheckConnectAuth(string(msg.ClientIdentifier), string(msg.Username), string(msg.Password)) {
+	if !b.CheckConnectAuth(string(msg.ClientIdentifier), string(msg.Username), string(msg.Password)) {
 		connack.ReturnCode = packets.ErrRefusedNotAuthorised
 		err = connack.Write(conn)
 		if err != nil {
@@ -225,7 +194,6 @@ func (b *Broker) handleConnection(typ int, conn net.Conn) {
 	}
 
 	c := &client{
-		typ:    typ,
 		broker: b,
 		conn:   conn,
 		info:   info,
@@ -243,32 +211,22 @@ func (b *Broker) handleConnection(typ int, conn net.Conn) {
 
 	var exist bool
 	var old interface{}
-
-	switch typ {
-	case CLIENT:
-		old, exist = b.clients.Load(cid)
-		if exist {
-			// log.Warn("client exist, close old...", zap.String("clientID", c.info.clientID))
-			ol, ok := old.(*client)
-			if ok {
-				ol.Close()
-			}
+	old, exist = b.clients.Load(cid)
+	if exist {
+		// log.Warn("client exist, close old...", zap.String("clientID", c.info.clientID))
+		ol, ok := old.(*client)
+		if ok {
+			ol.Close()
 		}
-		b.clients.Store(cid, c)
-
-		// TODO 上下线通知
 	}
+	b.clients.Store(cid, c)
 
 	c.readLoop()
 }
 
 func (b *Broker) removeClient(c *client) {
 	clientId := string(c.info.clientID)
-	typ := c.typ
-	switch typ {
-	case CLIENT:
-		b.clients.Delete(clientId)
-	}
+	b.clients.Delete(clientId)
 	// log.Info("delete client ,", clientId)
 }
 

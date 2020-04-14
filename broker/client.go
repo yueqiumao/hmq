@@ -21,18 +21,6 @@ import (
 )
 
 const (
-	// special pub topic for cluster info BrokerInfoTopic
-	BrokerInfoTopic = "broker000100101info"
-	// CLIENT is an end user.
-	CLIENT = 0
-	// ROUTER is another router in the cluster.
-	ROUTER = 1
-	//REMOTE is the router connect to other cluster
-	REMOTE  = 2
-	CLUSTER = 3
-)
-
-const (
 	_GroupTopicRegexp = `^\$share/([0-9a-zA-Z_-]+)/(.*)$`
 )
 
@@ -123,7 +111,7 @@ func (c *client) readLoop() {
 					client: c,
 					packet: DisconnectdPacket,
 				}
-				b.SubmitWork(c.info.clientID, msg)
+				ProcessMessage(msg)
 				return
 			}
 
@@ -134,7 +122,7 @@ func (c *client) readLoop() {
 					client: c,
 					packet: DisconnectdPacket,
 				}
-				b.SubmitWork(c.info.clientID, msg)
+				ProcessMessage(msg)
 				return
 			}
 
@@ -142,7 +130,7 @@ func (c *client) readLoop() {
 				client: c,
 				packet: packet,
 			}
-			b.SubmitWork(c.info.clientID, msg)
+			ProcessMessage(msg)
 		}
 	}
 
@@ -155,27 +143,23 @@ func ProcessMessage(msg *Message) {
 		return
 	}
 
-	if c.typ == CLIENT {
-		// log.Debug("Recv message:", zap.String("message type", reflect.TypeOf(msg.packet).String()[9:]), zap.String("ClientID", c.info.clientID))
-	}
-
 	switch ca.(type) {
 	case *packets.ConnackPacket:
 	case *packets.ConnectPacket:
 	case *packets.PublishPacket:
 		packet := ca.(*packets.PublishPacket)
-		c.ProcessPublish(packet)
+		c.processClientPublish(packet)
 	case *packets.PubackPacket:
 	case *packets.PubrecPacket:
 	case *packets.PubrelPacket:
 	case *packets.PubcompPacket:
 	case *packets.SubscribePacket:
 		packet := ca.(*packets.SubscribePacket)
-		c.ProcessSubscribe(packet)
+		c.processClientSubscribe(packet)
 	case *packets.SubackPacket:
 	case *packets.UnsubscribePacket:
 		packet := ca.(*packets.UnsubscribePacket)
-		c.ProcessUnSubscribe(packet)
+		c.processClientUnSubscribe(packet)
 	case *packets.UnsubackPacket:
 	case *packets.PingreqPacket:
 		c.ProcessPing()
@@ -185,14 +169,6 @@ func ProcessMessage(msg *Message) {
 	default:
 		// log.Info("Recv Unknow message.......", zap.String("ClientID", c.info.clientID))
 	}
-}
-
-func (c *client) ProcessPublish(packet *packets.PublishPacket) {
-	switch c.typ {
-	case CLIENT:
-		c.processClientPublish(packet)
-	}
-
 }
 
 func (c *client) processClientPublish(packet *packets.PublishPacket) {
@@ -240,7 +216,6 @@ func (c *client) ProcessPublishMessage(packet *packets.PublishPacket) {
 	if b == nil {
 		return
 	}
-	typ := c.typ
 
 	if packet.Retain {
 		if err := c.topicsMgr.Retain(packet); err != nil {
@@ -263,11 +238,6 @@ func (c *client) ProcessPublishMessage(packet *packets.PublishPacket) {
 	for i, sub := range c.subs {
 		s, ok := sub.(*subscription)
 		if ok {
-			if s.client.typ == ROUTER {
-				if typ != CLIENT {
-					continue
-				}
-			}
 			if s.share {
 				qsub = append(qsub, i)
 			} else {
@@ -284,15 +254,6 @@ func (c *client) ProcessPublishMessage(packet *packets.PublishPacket) {
 		publish(sub, packet)
 	}
 
-}
-
-func (c *client) ProcessSubscribe(packet *packets.SubscribePacket) {
-	switch c.typ {
-	case CLIENT:
-		c.processClientSubscribe(packet)
-	case ROUTER:
-		c.processRouterSubscribe(packet)
-	}
 }
 
 func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
@@ -389,109 +350,6 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 	}
 }
 
-func (c *client) processRouterSubscribe(packet *packets.SubscribePacket) {
-	if c.status == Disconnected {
-		return
-	}
-
-	b := c.broker
-	if b == nil {
-		return
-	}
-	topics := packet.Topics
-	qoss := packet.Qoss
-
-	suback := packets.NewControlPacket(packets.Suback).(*packets.SubackPacket)
-	suback.MessageID = packet.MessageID
-	var retcodes []byte
-
-	for i, topic := range topics {
-		t := topic
-		groupName := ""
-		share := false
-		if strings.HasPrefix(topic, "$share/") {
-			substr := groupCompile.FindStringSubmatch(topic)
-			if len(substr) != 3 {
-				retcodes = append(retcodes, QosFailure)
-				continue
-			}
-			share = true
-			groupName = substr[1]
-			topic = substr[2]
-		}
-
-		sub := &subscription{
-			topic:     topic,
-			qos:       qoss[i],
-			client:    c,
-			share:     share,
-			groupName: groupName,
-		}
-
-		rqos, err := c.topicsMgr.Subscribe([]byte(topic), qoss[i], sub)
-		if err != nil {
-			// log.Error("subscribe error, ", err, zap.String("ClientID", c.info.clientID))
-			retcodes = append(retcodes, QosFailure)
-			continue
-		}
-
-		c.subMap[t] = sub
-		addSubMap(c.routeSubMap, topic)
-		retcodes = append(retcodes, rqos)
-	}
-
-	suback.ReturnCodes = retcodes
-
-	err := c.WriterPacket(suback)
-	if err != nil {
-		// log.Error("send suback error, ", err, zap.String("ClientID", c.info.clientID))
-		return
-	}
-}
-
-func (c *client) ProcessUnSubscribe(packet *packets.UnsubscribePacket) {
-	switch c.typ {
-	case CLIENT:
-		c.processClientUnSubscribe(packet)
-	case ROUTER:
-		c.processRouterUnSubscribe(packet)
-	}
-}
-
-func (c *client) processRouterUnSubscribe(packet *packets.UnsubscribePacket) {
-	if c.status == Disconnected {
-		return
-	}
-	b := c.broker
-	if b == nil {
-		return
-	}
-	topics := packet.Topics
-
-	for _, topic := range topics {
-		sub, exist := c.subMap[topic]
-		if exist {
-			retainNum := delSubMap(c.routeSubMap, topic)
-			if retainNum > 0 {
-				continue
-			}
-
-			c.topicsMgr.Unsubscribe([]byte(sub.topic), sub)
-			delete(c.subMap, topic)
-		}
-
-	}
-
-	unsuback := packets.NewControlPacket(packets.Unsuback).(*packets.UnsubackPacket)
-	unsuback.MessageID = packet.MessageID
-
-	err := c.WriterPacket(unsuback)
-	if err != nil {
-		// log.Error("send unsuback error, ", err, zap.String("ClientID", c.info.clientID))
-		return
-	}
-}
-
 func (c *client) processClientUnSubscribe(packet *packets.UnsubscribePacket) {
 	if c.status == Disconnected {
 		return
@@ -583,12 +441,6 @@ func (c *client) Close() {
 			if err != nil {
 				// log.Error("unsubscribe error, ", err, zap.String("ClientID", c.info.clientID))
 			}
-		}
-
-		if c.typ == CLIENT {
-			// b.BroadcastUnSubscribe(subs)
-			//offline notification
-			// b.OnlineOfflineNotification(c.info.clientID, false)
 		}
 
 		if c.info.willMsg != nil {
