@@ -16,7 +16,7 @@ import (
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
 
-	"github.com/fhmq/hmq/broker/lib/sessions"
+	// "github.com/fhmq/hmq/broker/lib/sessions"
 	"github.com/fhmq/hmq/broker/lib/topics"
 )
 
@@ -34,16 +34,16 @@ var (
 )
 
 type client struct {
-	typ         int
-	mu          sync.Mutex
-	broker      *Broker
-	conn        net.Conn
-	info        info
-	route       route
-	status      int
-	ctx         context.Context
-	cancelFunc  context.CancelFunc
-	session     *sessions.Session
+	typ        int
+	mu         sync.Mutex
+	broker     *Broker
+	conn       net.Conn
+	info       info
+	route      route
+	status     int
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	// session     *sessions.Session
 	subMap      map[string]*subscription
 	topicsMgr   *topics.Manager
 	subs        []interface{}
@@ -377,7 +377,7 @@ func (c *client) processClientUnSubscribe(packet *packets.UnsubscribePacket) {
 		sub, exist := c.subMap[topic]
 		if exist {
 			c.topicsMgr.Unsubscribe([]byte(sub.topic), sub)
-			c.session.RemoveTopic(topic)
+			// c.session.RemoveTopic(topic)
 			delete(c.subMap, topic)
 		}
 

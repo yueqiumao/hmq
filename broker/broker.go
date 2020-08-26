@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
-	"github.com/fhmq/hmq/broker/lib/sessions"
 	"github.com/fhmq/hmq/broker/lib/topics"
 	"golang.org/x/net/websocket"
 )
@@ -20,12 +19,12 @@ type Message struct {
 }
 
 type Broker struct {
-	id         string
-	mu         sync.Mutex
-	config     *Config
-	clients    sync.Map
-	topicsMgr  *topics.Manager
-	sessionMgr *sessions.Manager
+	id        string
+	mu        sync.Mutex
+	config    *Config
+	clients   sync.Map
+	topicsMgr *topics.Manager
+	// sessionMgr *sessions.Manager
 	// auth       auth.Auth
 }
 
