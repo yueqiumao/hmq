@@ -7,16 +7,12 @@ import (
 	"errors"
 	"math/rand"
 	"net"
-
-	// "reflect"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
-
-	// "github.com/fhmq/hmq/broker/lib/sessions"
 	"github.com/fhmq/hmq/broker/lib/topics"
 )
 
@@ -172,24 +168,6 @@ func ProcessMessage(msg *Message) {
 }
 
 func (c *client) processClientPublish(packet *packets.PublishPacket) {
-
-	// topic := packet.TopicName
-
-	// if !c.broker.CheckTopicAuth(PUB, c.info.clientID, c.info.username, c.info.remoteIP, topic) {
-	// 	// log.Error("Pub Topics Auth failed, ", zap.String("topic", topic), zap.String("ClientID", c.info.clientID))
-	// 	return
-	// }
-
-	// //publish kafka
-	// c.broker.Publish(&bridge.Elements{
-	// 	ClientID:  c.info.clientID,
-	// 	Username:  c.info.username,
-	// 	Action:    bridge.Publish,
-	// 	Timestamp: time.Now().Unix(),
-	// 	Payload:   string(packet.Payload),
-	// 	Topic:     topic,
-	// })
-
 	switch packet.Qos {
 	case QosAtMostOnce:
 		c.ProcessPublishMessage(packet)
@@ -216,12 +194,6 @@ func (c *client) ProcessPublishMessage(packet *packets.PublishPacket) {
 	if b == nil {
 		return
 	}
-
-	// if packet.Retain {
-	// 	if err := c.topicsMgr.Retain(packet); err != nil {
-	// 		// log.Error("Error retaining message: ", err, zap.String("ClientID", c.info.clientID))
-	// 	}
-	// }
 
 	err := c.topicsMgr.Subscribers([]byte(packet.TopicName), packet.Qos, &c.subs, &c.qoss)
 	if err != nil {
@@ -274,20 +246,6 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 
 	for i, topic := range topics {
 		t := topic
-		//check topic auth for client
-		// if !b.CheckTopicAuth(SUB, c.info.clientID, c.info.username, c.info.remoteIP, topic) {
-		// 	// log.Error("Sub topic Auth failed: ", zap.String("topic", topic), zap.String("ClientID", c.info.clientID))
-		// 	retcodes = append(retcodes, QosFailure)
-		// 	continue
-		// }
-
-		// b.Publish(&bridge.Elements{
-		// 	ClientID:  c.info.clientID,
-		// 	Username:  c.info.username,
-		// 	Action:    bridge.Subscribe,
-		// 	Timestamp: time.Now().Unix(),
-		// 	Topic:     topic,
-		// })
 
 		groupName := ""
 		share := false
@@ -337,8 +295,6 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 		// log.Error("send suback error, ", err, zap.String("ClientID", c.info.clientID))
 		return
 	}
-	//broadcast subscribe message
-	// go b.BroadcastSubOrUnsubMessage(packet)
 
 	//process retain message
 	for _, rm := range c.rmsgs {
@@ -361,26 +317,11 @@ func (c *client) processClientUnSubscribe(packet *packets.UnsubscribePacket) {
 	topics := packet.Topics
 
 	for _, topic := range topics {
-		{
-			//publish kafka
-
-			// b.Publish(&bridge.Elements{
-			// 	ClientID:  c.info.clientID,
-			// 	Username:  c.info.username,
-			// 	Action:    bridge.Unsubscribe,
-			// 	Timestamp: time.Now().Unix(),
-			// 	Topic:     topic,
-			// })
-
-		}
-
 		sub, exist := c.subMap[topic]
 		if exist {
 			c.topicsMgr.Unsubscribe([]byte(sub.topic), sub)
-			// c.session.RemoveTopic(topic)
 			delete(c.subMap, topic)
 		}
-
 	}
 
 	unsuback := packets.NewControlPacket(packets.Unsuback).(*packets.UnsubackPacket)
@@ -391,8 +332,6 @@ func (c *client) processClientUnSubscribe(packet *packets.UnsubscribePacket) {
 		// log.Error("send unsuback error, ", err, zap.String("ClientID", c.info.clientID))
 		return
 	}
-	// //process ubsubscribe message
-	// b.BroadcastSubOrUnsubMessage(packet)
 }
 
 func (c *client) ProcessPing() {
@@ -415,18 +354,8 @@ func (c *client) Close() {
 	c.cancelFunc()
 
 	c.status = Disconnected
-	//wait for message complete
-	// time.Sleep(1 * time.Second)
-	// c.status = Disconnected
 
 	b := c.broker
-	// b.Publish(&bridge.Elements{
-	// 	ClientID:  c.info.clientID,
-	// 	Username:  c.info.username,
-	// 	Action:    bridge.Disconnect,
-	// 	Timestamp: time.Now().Unix(),
-	// })
-
 	if c.conn != nil {
 		c.conn.Close()
 		c.conn = nil

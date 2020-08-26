@@ -24,8 +24,6 @@ type Broker struct {
 	config    *Config
 	clients   sync.Map
 	topicsMgr *topics.Manager
-	// sessionMgr *sessions.Manager
-	// auth       auth.Auth
 }
 
 func NewBroker(config *Config) (*Broker, error) {
@@ -156,16 +154,6 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		}
 		return
 	}
-
-	// if !b.CheckConnectAuth(string(msg.ClientIdentifier), string(msg.Username), string(msg.Password)) {
-	// 	connack.ReturnCode = packets.ErrRefusedNotAuthorised
-	// 	err = connack.Write(conn)
-	// 	if err != nil {
-	// 		// log.Error("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
-	// 		return
-	// 	}
-	// 	return
-	// }
 
 	err = connack.Write(conn)
 	if err != nil {
