@@ -11,7 +11,6 @@ import (
 	"github.com/eclipse/paho.mqtt.golang/packets"
 	"github.com/fhmq/hmq/broker/lib/sessions"
 	"github.com/fhmq/hmq/broker/lib/topics"
-	"github.com/fhmq/hmq/plugins/auth"
 	"golang.org/x/net/websocket"
 )
 
@@ -27,7 +26,7 @@ type Broker struct {
 	clients    sync.Map
 	topicsMgr  *topics.Manager
 	sessionMgr *sessions.Manager
-	auth       auth.Auth
+	// auth       auth.Auth
 }
 
 func NewBroker(config *Config) (*Broker, error) {
@@ -47,13 +46,13 @@ func NewBroker(config *Config) (*Broker, error) {
 		return nil, err
 	}
 
-	b.sessionMgr, err = sessions.NewManager("mem")
-	if err != nil {
-		// log.Error("new session manager error", err)
-		return nil, err
-	}
+	// b.sessionMgr, err = sessions.NewManager("mem")
+	// if err != nil {
+	// 	// log.Error("new session manager error", err)
+	// 	return nil, err
+	// }
 
-	b.auth = auth.NewAuth(b.config.Plugin.Auth)
+	//b.auth = auth.NewAuth(b.config.Plugin.Auth)
 
 	return b, nil
 }
@@ -159,15 +158,15 @@ func (b *Broker) handleConnection(conn net.Conn) {
 		return
 	}
 
-	if !b.CheckConnectAuth(string(msg.ClientIdentifier), string(msg.Username), string(msg.Password)) {
-		connack.ReturnCode = packets.ErrRefusedNotAuthorised
-		err = connack.Write(conn)
-		if err != nil {
-			// log.Error("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
-			return
-		}
-		return
-	}
+	// if !b.CheckConnectAuth(string(msg.ClientIdentifier), string(msg.Username), string(msg.Password)) {
+	// 	connack.ReturnCode = packets.ErrRefusedNotAuthorised
+	// 	err = connack.Write(conn)
+	// 	if err != nil {
+	// 		// log.Error("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
+	// 		return
+	// 	}
+	// 	return
+	// }
 
 	err = connack.Write(conn)
 	if err != nil {
@@ -201,11 +200,11 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	c.init()
 
-	err = b.getSession(c, msg, connack)
-	if err != nil {
-		// log.Error("get session error: ", zap.String("clientID", c.info.clientID))
-		return
-	}
+	// err = b.getSession(c, msg, connack)
+	// if err != nil {
+	// 	// log.Error("get session error: ", zap.String("clientID", c.info.clientID))
+	// 	return
+	// }
 
 	cid := c.info.clientID
 

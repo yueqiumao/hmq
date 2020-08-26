@@ -173,12 +173,12 @@ func ProcessMessage(msg *Message) {
 
 func (c *client) processClientPublish(packet *packets.PublishPacket) {
 
-	topic := packet.TopicName
+	// topic := packet.TopicName
 
-	if !c.broker.CheckTopicAuth(PUB, c.info.clientID, c.info.username, c.info.remoteIP, topic) {
-		// log.Error("Pub Topics Auth failed, ", zap.String("topic", topic), zap.String("ClientID", c.info.clientID))
-		return
-	}
+	// if !c.broker.CheckTopicAuth(PUB, c.info.clientID, c.info.username, c.info.remoteIP, topic) {
+	// 	// log.Error("Pub Topics Auth failed, ", zap.String("topic", topic), zap.String("ClientID", c.info.clientID))
+	// 	return
+	// }
 
 	// //publish kafka
 	// c.broker.Publish(&bridge.Elements{
@@ -217,11 +217,11 @@ func (c *client) ProcessPublishMessage(packet *packets.PublishPacket) {
 		return
 	}
 
-	if packet.Retain {
-		if err := c.topicsMgr.Retain(packet); err != nil {
-			// log.Error("Error retaining message: ", err, zap.String("ClientID", c.info.clientID))
-		}
-	}
+	// if packet.Retain {
+	// 	if err := c.topicsMgr.Retain(packet); err != nil {
+	// 		// log.Error("Error retaining message: ", err, zap.String("ClientID", c.info.clientID))
+	// 	}
+	// }
 
 	err := c.topicsMgr.Subscribers([]byte(packet.TopicName), packet.Qos, &c.subs, &c.qoss)
 	if err != nil {
@@ -275,11 +275,11 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 	for i, topic := range topics {
 		t := topic
 		//check topic auth for client
-		if !b.CheckTopicAuth(SUB, c.info.clientID, c.info.username, c.info.remoteIP, topic) {
-			// log.Error("Sub topic Auth failed: ", zap.String("topic", topic), zap.String("ClientID", c.info.clientID))
-			retcodes = append(retcodes, QosFailure)
-			continue
-		}
+		// if !b.CheckTopicAuth(SUB, c.info.clientID, c.info.username, c.info.remoteIP, topic) {
+		// 	// log.Error("Sub topic Auth failed: ", zap.String("topic", topic), zap.String("ClientID", c.info.clientID))
+		// 	retcodes = append(retcodes, QosFailure)
+		// 	continue
+		// }
 
 		// b.Publish(&bridge.Elements{
 		// 	ClientID:  c.info.clientID,
@@ -324,7 +324,7 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 
 		c.subMap[t] = sub
 
-		c.session.AddTopic(t, qoss[i])
+		// c.session.AddTopic(t, qoss[i])
 		retcodes = append(retcodes, rqos)
 		c.topicsMgr.Retained([]byte(topic), &c.rmsgs)
 
