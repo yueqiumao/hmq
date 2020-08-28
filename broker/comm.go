@@ -3,6 +3,7 @@
 package broker
 
 import (
+	"log"
 	"reflect"
 	"time"
 
@@ -96,6 +97,6 @@ func GenUniqueId() string {
 func publish(sub *subscription, packet *packets.PublishPacket) {
 	err := sub.client.WriterPacket(packet)
 	if err != nil {
-		// log.Error("process message for psub error,  ", err)
+		log.Print("process message for psub error,  ", err)
 	}
 }

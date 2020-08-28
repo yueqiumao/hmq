@@ -3,6 +3,7 @@
 package broker
 
 import (
+	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
 	"github.com/fhmq/hmq/broker/lib/topics"
+	"go.uber.org/zap"
 	"golang.org/x/net/websocket"
 )
 
@@ -39,24 +41,16 @@ func NewBroker(config *Config) (*Broker, error) {
 	var err error
 	b.topicsMgr, err = topics.NewManager("mem")
 	if err != nil {
-		// log.Error("new topic manager error", err)
+		log.Print("new topic manager error", err)
 		return nil, err
 	}
-
-	// b.sessionMgr, err = sessions.NewManager("mem")
-	// if err != nil {
-	// 	// log.Error("new session manager error", err)
-	// 	return nil, err
-	// }
-
-	//b.auth = auth.NewAuth(b.config.Plugin.Auth)
 
 	return b, nil
 }
 
 func (b *Broker) Start() {
 	if b == nil {
-		// log.Error("broker is null")
+		log.Print("broker is null")
 		return
 	}
 
@@ -74,17 +68,16 @@ func (b *Broker) Start() {
 func (b *Broker) StartWebsocketListening() {
 	path := b.config.WsPath
 	hp := ":" + b.config.WsPort
-	// log.Info("Start Websocket Listener on:", zap.String("hp", hp), zap.String("path", path))
+	log.Print("Start Websocket Listener on:", zap.String("hp", hp), zap.String("path", path))
 	http.Handle(path, websocket.Handler(b.wsHandler))
 	err := http.ListenAndServe(hp, nil)
 	if err != nil {
-		// log.Error("ListenAndServe:" + err.Error())
+		log.Print("ListenAndServe:" + err.Error())
 		return
 	}
 }
 
 func (b *Broker) wsHandler(ws *websocket.Conn) {
-	// io.Copy(ws, ws)
 	ws.PayloadType = websocket.BinaryFrame
 	b.handleConnection(ws)
 }
@@ -95,9 +88,9 @@ func (b *Broker) StartClientListening() {
 	var l net.Listener
 	hp = b.config.Host + ":" + b.config.Port
 	l, err = net.Listen("tcp", hp)
-	// log.Info("Start Listening client on ", zap.String("hp", hp))
+	log.Print("Start Listening client on ", zap.String("hp", hp))
 	if err != nil {
-		// log.Error("Error listening on ", err)
+		log.Print("Error listening on ", err)
 		return
 	}
 	tmpDelay := 10 * ACCEPT_MIN_SLEEP
@@ -106,14 +99,13 @@ func (b *Broker) StartClientListening() {
 		if err != nil {
 			if ne, ok := err.(net.Error); ok && ne.Temporary() {
 				// log.Error("Temporary Client Accept Error(%v), sleeping %dms",
-				// zap.Error(ne), zap.Duration("sleeping", tmpDelay/time.Millisecond))
 				time.Sleep(tmpDelay)
 				tmpDelay *= 2
 				if tmpDelay > ACCEPT_MAX_SLEEP {
 					tmpDelay = ACCEPT_MAX_SLEEP
 				}
 			} else {
-				// log.Error("Accept error: %v", err)
+				log.Print("Accept error: %v", err)
 			}
 			continue
 		}
@@ -127,20 +119,20 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	//process connect packet
 	packet, err := packets.ReadPacket(conn)
 	if err != nil {
-		// log.Error("read connect packet error: ", err)
+		log.Print("read connect packet error: ", err)
 		return
 	}
 	if packet == nil {
-		// log.Error("received nil packet")
+		log.Print("received nil packet")
 		return
 	}
 	msg, ok := packet.(*packets.ConnectPacket)
 	if !ok {
-		// log.Error("received msg that was not Connect")
+		log.Print("received msg that was not Connect")
 		return
 	}
 
-	// log.Info("read connect from ", zap.String("clientID", msg.ClientIdentifier))
+	log.Print("read connect from ", zap.String("clientID", msg.ClientIdentifier))
 
 	connack := packets.NewControlPacket(packets.Connack).(*packets.ConnackPacket)
 	connack.SessionPresent = msg.CleanSession
@@ -149,7 +141,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	if connack.ReturnCode != packets.Accepted {
 		err = connack.Write(conn)
 		if err != nil {
-			// log.Error("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
+			log.Print("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
 			return
 		}
 		return
@@ -157,7 +149,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	err = connack.Write(conn)
 	if err != nil {
-		// log.Error("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
+		log.Print("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
 		return
 	}
 
@@ -187,19 +179,13 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	c.init()
 
-	// err = b.getSession(c, msg, connack)
-	// if err != nil {
-	// 	// log.Error("get session error: ", zap.String("clientID", c.info.clientID))
-	// 	return
-	// }
-
 	cid := c.info.clientID
 
 	var exist bool
 	var old interface{}
 	old, exist = b.clients.Load(cid)
 	if exist {
-		// log.Warn("client exist, close old...", zap.String("clientID", c.info.clientID))
+		log.Print("client exist, close old...", zap.String("clientID", c.info.clientID))
 		ol, ok := old.(*client)
 		if ok {
 			ol.Close()
@@ -213,7 +199,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 func (b *Broker) removeClient(c *client) {
 	clientId := string(c.info.clientID)
 	b.clients.Delete(clientId)
-	// log.Info("delete client ,", clientId)
+	log.Print("delete client ,", clientId)
 }
 
 func (b *Broker) PublishMessage(packet *packets.PublishPacket) {
@@ -223,7 +209,7 @@ func (b *Broker) PublishMessage(packet *packets.PublishPacket) {
 	err := b.topicsMgr.Subscribers([]byte(packet.TopicName), packet.Qos, &subs, &qoss)
 	b.mu.Unlock()
 	if err != nil {
-		// log.Error("search sub client error,  ", err)
+		log.Print("search sub client error,  ", err)
 		return
 	}
 
@@ -232,7 +218,7 @@ func (b *Broker) PublishMessage(packet *packets.PublishPacket) {
 		if ok {
 			err := s.client.WriterPacket(packet)
 			if err != nil {
-				// log.Error("write message error,  ", err)
+				log.Print("write message error,  ", err)
 			}
 		}
 	}

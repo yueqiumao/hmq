@@ -5,6 +5,7 @@ package broker
 import (
 	"context"
 	"errors"
+	"log"
 	"math/rand"
 	"net"
 	"regexp"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
 	"github.com/fhmq/hmq/broker/lib/topics"
+	"go.uber.org/zap"
 )
 
 const (
@@ -102,7 +104,7 @@ func (c *client) readLoop() {
 		default:
 			//add read timeout
 			if err := nc.SetReadDeadline(time.Now().Add(timeOut)); err != nil {
-				// log.Error("set read timeout error: ", err, zap.String("ClientID", c.info.clientID))
+				log.Print("set read timeout error: ", err, zap.String("ClientID", c.info.clientID))
 				msg := &Message{
 					client: c,
 					packet: DisconnectdPacket,
@@ -113,7 +115,7 @@ func (c *client) readLoop() {
 
 			packet, err := packets.ReadPacket(nc)
 			if err != nil {
-				// log.Error("read packet error: ", err, zap.String("ClientID", c.info.clientID))
+				log.Print("read packet error: ", err, zap.String("ClientID", c.info.clientID))
 				msg := &Message{
 					client: c,
 					packet: DisconnectdPacket,
@@ -163,7 +165,7 @@ func ProcessMessage(msg *Message) {
 	case *packets.DisconnectPacket:
 		c.Close()
 	default:
-		// log.Info("Recv Unknow message.......", zap.String("ClientID", c.info.clientID))
+		log.Print("Recv Unknow message.......", zap.String("ClientID", c.info.clientID))
 	}
 }
 
@@ -175,14 +177,14 @@ func (c *client) processClientPublish(packet *packets.PublishPacket) {
 		puback := packets.NewControlPacket(packets.Puback).(*packets.PubackPacket)
 		puback.MessageID = packet.MessageID
 		if err := c.WriterPacket(puback); err != nil {
-			// log.Error("send puback error, ", err, zap.String("ClientID", c.info.clientID))
+			log.Print("send puback error, ", err, zap.String("ClientID", c.info.clientID))
 			return
 		}
 		c.ProcessPublishMessage(packet)
 	case QosExactlyOnce:
 		return
 	default:
-		// log.Error("publish with unknown qos", zap.String("ClientID", c.info.clientID))
+		log.Print("publish with unknown qos", zap.String("ClientID", c.info.clientID))
 		return
 	}
 
@@ -275,14 +277,13 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 
 		rqos, err := c.topicsMgr.Subscribe([]byte(topic), qoss[i], sub)
 		if err != nil {
-			// log.Error("subscribe error, ", err, zap.String("ClientID", c.info.clientID))
+			log.Print("subscribe error, ", err, zap.String("ClientID", c.info.clientID))
 			retcodes = append(retcodes, QosFailure)
 			continue
 		}
 
 		c.subMap[t] = sub
 
-		// c.session.AddTopic(t, qoss[i])
 		retcodes = append(retcodes, rqos)
 		c.topicsMgr.Retained([]byte(topic), &c.rmsgs)
 
@@ -292,16 +293,16 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 
 	err := c.WriterPacket(suback)
 	if err != nil {
-		// log.Error("send suback error, ", err, zap.String("ClientID", c.info.clientID))
+		log.Print("send suback error, ", err, zap.String("ClientID", c.info.clientID))
 		return
 	}
 
 	//process retain message
 	for _, rm := range c.rmsgs {
 		if err := c.WriterPacket(rm); err != nil {
-			// log.Error("Error publishing retained message:", zap.Any("err", err), zap.String("ClientID", c.info.clientID))
+			log.Print("Error publishing retained message:", zap.Any("err", err), zap.String("ClientID", c.info.clientID))
 		} else {
-			// log.Info("process retain  message: ", zap.Any("packet", packet), zap.String("ClientID", c.info.clientID))
+			log.Print("process retain  message: ", zap.Any("packet", packet), zap.String("ClientID", c.info.clientID))
 		}
 	}
 }
@@ -329,7 +330,7 @@ func (c *client) processClientUnSubscribe(packet *packets.UnsubscribePacket) {
 
 	err := c.WriterPacket(unsuback)
 	if err != nil {
-		// log.Error("send unsuback error, ", err, zap.String("ClientID", c.info.clientID))
+		log.Print("send unsuback error, ", err, zap.String("ClientID", c.info.clientID))
 		return
 	}
 }
@@ -341,7 +342,7 @@ func (c *client) ProcessPing() {
 	resp := packets.NewControlPacket(packets.Pingresp).(*packets.PingrespPacket)
 	err := c.WriterPacket(resp)
 	if err != nil {
-		// log.Error("send PingResponse error, ", err, zap.String("ClientID", c.info.clientID))
+		log.Print("send PingResponse error, ", err, zap.String("ClientID", c.info.clientID))
 		return
 	}
 }
@@ -368,7 +369,7 @@ func (c *client) Close() {
 		for _, sub := range subs {
 			err := b.topicsMgr.Unsubscribe([]byte(sub.topic), sub)
 			if err != nil {
-				// log.Error("unsubscribe error, ", err, zap.String("ClientID", c.info.clientID))
+				log.Print("unsubscribe error, ", err, zap.String("ClientID", c.info.clientID))
 			}
 		}
 
