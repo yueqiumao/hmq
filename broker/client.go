@@ -243,7 +243,6 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 		c.subMap[t] = sub
 
 		retcodes = append(retcodes, rqos)
-		c.topicsMgr.Retained([]byte(topic), &c.rmsgs)
 
 	}
 

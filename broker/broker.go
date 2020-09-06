@@ -39,7 +39,6 @@ func NewBroker(config *Config) (*Broker, error) {
 
 	b.topicsMgr = &memTopics{
 		sroot: newSNode(),
-		rroot: newRNode(),
 	}
 
 	return b, nil

@@ -12,22 +12,6 @@ type memTopics struct {
 	smu sync.RWMutex
 	// Subscription tree
 	sroot *snode
-
-	// Retained message mutex
-	rmu sync.RWMutex
-	// Retained messages topic tree
-	rroot *rnode
-}
-
-// NewMemProvider returns an new instance of the memTopics, which is implements the
-// TopicsProvider interface. memProvider is a hidden struct that stores the topic
-// subscriptions and retained messages in memory. The content is not persistend so
-// when the server goes, everything will be gone. Use with care.
-func NewMemProvider() *memTopics {
-	return &memTopics{
-		sroot: newSNode(),
-		rroot: newRNode(),
-	}
 }
 
 func ValidQos(qos byte) bool {
@@ -79,30 +63,8 @@ func (this *memTopics) Subscribers(topic []byte, qos byte, subs *[]interface{}, 
 	return this.sroot.smatch(topic, qos, subs, qoss)
 }
 
-func (this *memTopics) Retain(msg *packets.PublishPacket) error {
-	this.rmu.Lock()
-	defer this.rmu.Unlock()
-
-	// So apparently, at least according to the MQTT Conformance/Interoperability
-	// Testing, that a payload of 0 means delete the retain message.
-	// https://eclipse.org/paho/clients/testing/
-	if len(msg.Payload) == 0 {
-		return this.rroot.rremove([]byte(msg.TopicName))
-	}
-
-	return this.rroot.rinsert([]byte(msg.TopicName), msg)
-}
-
-func (this *memTopics) Retained(topic []byte, msgs *[]*packets.PublishPacket) error {
-	this.rmu.RLock()
-	defer this.rmu.RUnlock()
-
-	return this.rroot.rmatch(topic, msgs)
-}
-
 func (this *memTopics) Close() error {
 	this.sroot = nil
-	this.rroot = nil
 	return nil
 }
 
