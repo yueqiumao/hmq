@@ -101,7 +101,7 @@ func (b *Broker) StartClientListening() {
 					tmpDelay = ACCEPT_MAX_SLEEP
 				}
 			} else {
-				log.Print("Accept error: %v", err)
+				log.Print("Accept error: ", err.Error())
 			}
 			continue
 		}
