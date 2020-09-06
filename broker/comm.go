@@ -62,6 +62,10 @@ const (
 	_WC = "#+"
 )
 
+func ValidQos(qos byte) bool {
+	return qos == QosAtMostOnce || qos == QosAtLeastOnce || qos == QosExactlyOnce
+}
+
 func equal(k1, k2 interface{}) bool {
 	if reflect.TypeOf(k1) != reflect.TypeOf(k2) {
 		return false
