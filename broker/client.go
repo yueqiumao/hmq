@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"math/rand"
 	"net"
 	"strings"
 	"sync"
@@ -22,21 +21,17 @@ const (
 )
 
 type client struct {
-	typ         int
-	mu          sync.Mutex
-	broker      *Broker
-	conn        net.Conn
-	info        info
-	route       route
-	status      int
-	ctx         context.Context
-	cancelFunc  context.CancelFunc
-	subMap      map[string]*subscription
-	topicsMgr   *memTopics
-	subs        []interface{}
-	qoss        []byte
-	rmsgs       []*packets.PublishPacket
-	routeSubMap map[string]uint64
+	mu         sync.Mutex
+	broker     *Broker
+	conn       net.Conn
+	info       info
+	status     int
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	subMap     map[string]*subscription
+	topicsMgr  *memTopics
+	subs       []interface{}
+	qoss       []byte
 }
 
 type subscription struct {
@@ -55,14 +50,8 @@ type info struct {
 	remoteIP  string
 }
 
-type route struct {
-	remoteID  string
-	remoteUrl string
-}
-
 var (
 	DisconnectdPacket = packets.NewControlPacket(packets.Disconnect).(*packets.DisconnectPacket)
-	r                 = rand.New(rand.NewSource(time.Now().UnixNano()))
 )
 
 func (c *client) init() {
@@ -252,15 +241,6 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 	if err != nil {
 		log.Print("send suback error, ", err, zap.String("ClientID", c.info.clientID))
 		return
-	}
-
-	//process retain message
-	for _, rm := range c.rmsgs {
-		if err := c.WriterPacket(rm); err != nil {
-			log.Print("Error publishing retained message:", zap.Any("err", err), zap.String("ClientID", c.info.clientID))
-		} else {
-			log.Print("process retain  message: ", zap.Any("packet", packet), zap.String("ClientID", c.info.clientID))
-		}
 	}
 }
 
