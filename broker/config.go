@@ -10,6 +10,8 @@ type Config struct {
 }
 
 var DefaultConfig *Config = &Config{
-	Host: "0.0.0.0",
-	Port: "1883",
+	Host:   "0.0.0.0",
+	Port:   "1883",
+	WsPort: "1884",
+	WsPath: "/",
 }

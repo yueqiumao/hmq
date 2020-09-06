@@ -8,7 +8,6 @@ import (
 	"log"
 	"math/rand"
 	"net"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -19,16 +18,8 @@ import (
 )
 
 const (
-	_GroupTopicRegexp = `^\$share/([0-9a-zA-Z_-]+)/(.*)$`
-)
-
-const (
 	Connected    = 1
 	Disconnected = 2
-)
-
-var (
-	groupCompile = regexp.MustCompile(_GroupTopicRegexp)
 )
 
 type client struct {
@@ -51,11 +42,9 @@ type client struct {
 }
 
 type subscription struct {
-	client    *client
-	topic     string
-	qos       byte
-	share     bool
-	groupName string
+	client *client
+	topic  string
+	qos    byte
 }
 
 type info struct {
@@ -208,26 +197,12 @@ func (c *client) ProcessPublishMessage(packet *packets.PublishPacket) {
 		return
 	}
 
-	var qsub []int
-	for i, sub := range c.subs {
+	for _, sub := range c.subs {
 		s, ok := sub.(*subscription)
 		if ok {
-			if s.share {
-				qsub = append(qsub, i)
-			} else {
-				publish(s, packet)
-			}
-
+			publish(s, packet)
 		}
-
 	}
-
-	if len(qsub) > 0 {
-		idx := r.Intn(len(qsub))
-		sub := c.subs[qsub[idx]].(*subscription)
-		publish(sub, packet)
-	}
-
 }
 
 func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
@@ -249,30 +224,15 @@ func (c *client) processClientSubscribe(packet *packets.SubscribePacket) {
 	for i, topic := range topics {
 		t := topic
 
-		groupName := ""
-		share := false
-		if strings.HasPrefix(topic, "$share/") {
-			substr := groupCompile.FindStringSubmatch(topic)
-			if len(substr) != 3 {
-				retcodes = append(retcodes, QosFailure)
-				continue
-			}
-			share = true
-			groupName = substr[1]
-			topic = substr[2]
-		}
-
 		if oldSub, exist := c.subMap[t]; exist {
 			c.topicsMgr.Unsubscribe([]byte(oldSub.topic), oldSub)
 			delete(c.subMap, t)
 		}
 
 		sub := &subscription{
-			topic:     topic,
-			qos:       qoss[i],
-			client:    c,
-			share:     share,
-			groupName: groupName,
+			topic:  topic,
+			qos:    qoss[i],
+			client: c,
 		}
 
 		rqos, err := c.topicsMgr.Subscribe([]byte(topic), qoss[i], sub)
