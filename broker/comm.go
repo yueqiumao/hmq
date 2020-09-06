@@ -45,6 +45,23 @@ const (
 	QosFailure = 0x80
 )
 
+const (
+	// MWC is the multi-level wildcard
+	MWC = "#"
+
+	// SWC is the single level wildcard
+	SWC = "+"
+
+	// SEP is the topic level separator
+	SEP = "/"
+
+	// SYS is the starting character of the system level topics
+	SYS = "$"
+
+	// Both wildcards
+	_WC = "#+"
+)
+
 func equal(k1, k2 interface{}) bool {
 	if reflect.TypeOf(k1) != reflect.TypeOf(k2) {
 		return false

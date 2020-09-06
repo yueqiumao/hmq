@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
-	"github.com/fhmq/hmq/broker/lib/topics"
 	"go.uber.org/zap"
 )
 
@@ -23,18 +22,17 @@ const (
 )
 
 type client struct {
-	typ        int
-	mu         sync.Mutex
-	broker     *Broker
-	conn       net.Conn
-	info       info
-	route      route
-	status     int
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	// session     *sessions.Session
+	typ         int
+	mu          sync.Mutex
+	broker      *Broker
+	conn        net.Conn
+	info        info
+	route       route
+	status      int
+	ctx         context.Context
+	cancelFunc  context.CancelFunc
 	subMap      map[string]*subscription
-	topicsMgr   *topics.Manager
+	topicsMgr   *memTopics
 	subs        []interface{}
 	qoss        []byte
 	rmsgs       []*packets.PublishPacket

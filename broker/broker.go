@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/eclipse/paho.mqtt.golang/packets"
-	"github.com/fhmq/hmq/broker/lib/topics"
 	"go.uber.org/zap"
 	"golang.org/x/net/websocket"
 )
@@ -25,7 +24,7 @@ type Broker struct {
 	mu        sync.Mutex
 	config    *Config
 	clients   sync.Map
-	topicsMgr *topics.Manager
+	topicsMgr *memTopics
 }
 
 func NewBroker(config *Config) (*Broker, error) {
@@ -38,11 +37,9 @@ func NewBroker(config *Config) (*Broker, error) {
 		config: config,
 	}
 
-	var err error
-	b.topicsMgr, err = topics.NewManager("mem")
-	if err != nil {
-		log.Print("new topic manager error", err)
-		return nil, err
+	b.topicsMgr = &memTopics{
+		sroot: newSNode(),
+		rroot: newRNode(),
 	}
 
 	return b, nil
