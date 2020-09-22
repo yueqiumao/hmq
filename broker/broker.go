@@ -3,7 +3,6 @@
 package broker
 
 import (
-	"log"
 	"net"
 	"net/http"
 	"sync"
@@ -46,7 +45,7 @@ func NewBroker(config *Config) (*Broker, error) {
 
 func (b *Broker) Start() {
 	if b == nil {
-		log.Print("broker is null")
+		logger.Info("broker is null")
 		return
 	}
 
@@ -64,11 +63,11 @@ func (b *Broker) Start() {
 func (b *Broker) StartWebsocketListening() {
 	path := b.config.WsPath
 	hp := ":" + b.config.WsPort
-	log.Print("Start Websocket Listener on:", zap.String("hp", hp), zap.String("path", path))
+	logger.Info("Start Websocket Listener on:", zap.String("hp", hp), zap.String("path", path))
 	http.Handle(path, websocket.Handler(b.wsHandler))
 	err := http.ListenAndServe(hp, nil)
 	if err != nil {
-		log.Print("ListenAndServe:" + err.Error())
+		logger.Info("ListenAndServe:" + err.Error())
 		return
 	}
 }
@@ -84,9 +83,9 @@ func (b *Broker) StartClientListening() {
 	var l net.Listener
 	hp = b.config.Host + ":" + b.config.Port
 	l, err = net.Listen("tcp", hp)
-	log.Print("Start Listening client on ", zap.String("hp", hp))
+	logger.Info("Start Listening client on ", zap.String("hp", hp))
 	if err != nil {
-		log.Print("Error listening on ", err)
+		logger.Error("Error listening on ", zap.Error(err))
 		return
 	}
 	tmpDelay := 10 * ACCEPT_MIN_SLEEP
@@ -101,7 +100,7 @@ func (b *Broker) StartClientListening() {
 					tmpDelay = ACCEPT_MAX_SLEEP
 				}
 			} else {
-				log.Print("Accept error: ", err.Error())
+				logger.Error("Accept error: ", zap.Error(err))
 			}
 			continue
 		}
@@ -115,20 +114,20 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	//process connect packet
 	packet, err := packets.ReadPacket(conn)
 	if err != nil {
-		log.Print("read connect packet error: ", err)
+		logger.Error("read connect packet error: ", zap.Error(err))
 		return
 	}
 	if packet == nil {
-		log.Print("received nil packet")
+		logger.Info("received nil packet")
 		return
 	}
 	msg, ok := packet.(*packets.ConnectPacket)
 	if !ok {
-		log.Print("received msg that was not Connect")
+		logger.Info("received msg that was not Connect")
 		return
 	}
 
-	log.Print("read connect from ", zap.String("clientID", msg.ClientIdentifier))
+	logger.Info("read connect from ", zap.String("clientID", msg.ClientIdentifier))
 
 	connack := packets.NewControlPacket(packets.Connack).(*packets.ConnackPacket)
 	connack.SessionPresent = msg.CleanSession
@@ -137,7 +136,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	if connack.ReturnCode != packets.Accepted {
 		err = connack.Write(conn)
 		if err != nil {
-			log.Print("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
+			logger.Error("send connack error, ", zap.Error(err), zap.String("clientID", msg.ClientIdentifier))
 			return
 		}
 		return
@@ -145,7 +144,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 
 	err = connack.Write(conn)
 	if err != nil {
-		log.Print("send connack error, ", err, zap.String("clientID", msg.ClientIdentifier))
+		logger.Error("send connack error, ", zap.Error(err), zap.String("clientID", msg.ClientIdentifier))
 		return
 	}
 
@@ -181,7 +180,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 	var old interface{}
 	old, exist = b.clients.Load(cid)
 	if exist {
-		log.Print("client exist, close old...", zap.String("clientID", c.info.clientID))
+		logger.Info("client exist, close old...", zap.String("clientID", c.info.clientID))
 		ol, ok := old.(*client)
 		if ok {
 			ol.Close()
@@ -195,7 +194,7 @@ func (b *Broker) handleConnection(conn net.Conn) {
 func (b *Broker) removeClient(c *client) {
 	clientId := string(c.info.clientID)
 	b.clients.Delete(clientId)
-	log.Print("delete client ,", clientId)
+	logger.Info("delete client ,", zap.String("clientId", clientId))
 }
 
 func (b *Broker) PublishMessage(packet *packets.PublishPacket) {
@@ -205,7 +204,7 @@ func (b *Broker) PublishMessage(packet *packets.PublishPacket) {
 	err := b.topicsMgr.Subscribers([]byte(packet.TopicName), packet.Qos, &subs, &qoss)
 	b.mu.Unlock()
 	if err != nil {
-		log.Print("search sub client error,  ", err)
+		logger.Error("search sub client error,  ", zap.Error(err))
 		return
 	}
 
@@ -214,7 +213,7 @@ func (b *Broker) PublishMessage(packet *packets.PublishPacket) {
 		if ok {
 			err := s.client.WriterPacket(packet)
 			if err != nil {
-				log.Print("write message error,  ", err)
+				logger.Error("write message error,  ", zap.Error(err))
 			}
 		}
 	}
